@@ -73,6 +73,11 @@ def create_test():
     # In a real app, check if user is teacher first
     return TeacherController.create_test()
 
+@app.route('/api/tests/generate', methods=['POST'])
+def generate_ai_test():
+    # In a real app, check if user is an approved teacher first
+    return TeacherController.generate_ai_test()
+
 @app.route('/api/teachers/<teacher_id>/tests', methods=['GET'])
 def get_teacher_tests(teacher_id):
     # In a real app, check if user is authorized first

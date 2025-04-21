@@ -2,6 +2,7 @@ import os
 import requests
 from dotenv import load_dotenv
 import urllib.parse
+import json
 
 class MistralAPI:
     def __init__(self, debug=False):
@@ -55,7 +56,17 @@ class MistralAPI:
             # Try to parse as JSON first
             try:
                 data = response.json()
-                return data.get("response", "")
+                
+                # Handle different response types
+                if isinstance(data, dict):
+                    # If it's a dictionary, try to get the "response" field
+                    return data.get("response", response.text)
+                elif isinstance(data, list):
+                    # If it's a list (like in the AI test generation case), return it directly
+                    return json.dumps(data)
+                else:
+                    # For any other type, convert to string
+                    return str(data)
             except ValueError:
                 # If not JSON, return the raw text response
                 if self.debug:

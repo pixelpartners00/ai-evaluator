@@ -57,6 +57,11 @@ export const teacherService = {
     return response.data;
   },
 
+  generateAITest: async (testParams) => {
+    const response = await api.post("/tests/generate", testParams);
+    return response.data;
+  },
+
   getTests: async (teacherId) => {
     const response = await api.get(`/teachers/${teacherId}/tests`);
     return response.data;

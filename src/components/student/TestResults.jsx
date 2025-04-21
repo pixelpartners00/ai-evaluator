@@ -139,73 +139,136 @@ const TestResults = ({ userId }) => {
 
         <div className="space-y-6">
           {test.questions.map((question, index) => {
-            const selectedAnswer = attempt.answers[index];
-            const isCorrect = selectedAnswer === question.correct_answer;
+            const studentAnswer = attempt.answers[index];
+            const questionType = question.type || "mcq"; // Default to mcq for backward compatibility
+            const questionScore = attempt.question_scores
+              ? attempt.question_scores[index]
+              : null;
+            const feedback = attempt.feedback ? attempt.feedback[index] : null;
+
+            // For MCQ questions
+            const isCorrect =
+              questionType === "mcq" &&
+              studentAnswer === question.correct_answer;
 
             return (
               <div
                 key={index}
                 className={`p-4 rounded-lg border ${
-                  isCorrect
-                    ? "border-green-200 bg-green-50"
-                    : "border-red-200 bg-red-50"
+                  questionType === "mcq"
+                    ? isCorrect
+                      ? "border-green-200 bg-green-50"
+                      : "border-red-200 bg-red-50"
+                    : "border-blue-200 bg-blue-50"
                 }`}
               >
                 <div className="flex items-start">
                   <div className="mr-3">
-                    <span
-                      className={`inline-block w-6 h-6 rounded-full text-center ${
-                        isCorrect ? "bg-green-500" : "bg-red-500"
-                      } text-white font-bold`}
-                    >
-                      {isCorrect ? "✓" : "✗"}
-                    </span>
+                    {questionType === "mcq" ? (
+                      <span
+                        className={`inline-block w-6 h-6 rounded-full text-center ${
+                          isCorrect ? "bg-green-500" : "bg-red-500"
+                        } text-white font-bold`}
+                      >
+                        {isCorrect ? "✓" : "✗"}
+                      </span>
+                    ) : (
+                      <span className="inline-block w-6 h-6 rounded-full text-center bg-blue-500 text-white font-bold">
+                        {Math.round(questionScore)}
+                      </span>
+                    )}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h4 className="text-md font-medium">
                       Question {index + 1}: {question.text}
                     </h4>
 
-                    <div className="mt-3 ml-2 space-y-1">
-                      {question.options.map((option, optIndex) => (
-                        <div
-                          key={optIndex}
-                          className={`p-2 rounded ${
-                            optIndex === selectedAnswer &&
-                            optIndex === question.correct_answer
-                              ? "bg-green-200"
-                              : optIndex === selectedAnswer
-                              ? "bg-red-200"
-                              : optIndex === question.correct_answer
-                              ? "bg-green-100"
-                              : ""
-                          }`}
-                        >
-                          <div className="flex items-center">
-                            <span className="mr-2 text-sm font-medium">
-                              {String.fromCharCode(65 + optIndex)}.
-                            </span>
-                            <span>
-                              {option}
-                              {optIndex === question.correct_answer && (
-                                <span className="ml-2 text-green-600 font-medium">
-                                  (Correct Answer)
-                                </span>
-                              )}
-                            </span>
+                    {/* For MCQ questions, show options */}
+                    {questionType === "mcq" && (
+                      <div className="mt-3 ml-2 space-y-1">
+                        {question.options.map((option, optIndex) => (
+                          <div
+                            key={optIndex}
+                            className={`p-2 rounded ${
+                              optIndex === studentAnswer &&
+                              optIndex === question.correct_answer
+                                ? "bg-green-200"
+                                : optIndex === studentAnswer
+                                ? "bg-red-200"
+                                : optIndex === question.correct_answer
+                                ? "bg-green-100"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-center">
+                              <span className="mr-2 text-sm font-medium">
+                                {String.fromCharCode(65 + optIndex)}.
+                              </span>
+                              <span>
+                                {option}
+                                {optIndex === question.correct_answer && (
+                                  <span className="ml-2 text-green-600 font-medium">
+                                    (Correct Answer)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+
+                        {!isCorrect && (
+                          <div className="mt-2 text-sm text-red-600">
+                            You selected{" "}
+                            {studentAnswer !== null
+                              ? String.fromCharCode(65 + studentAnswer)
+                              : "no option"}
+                            , but the correct answer was{" "}
+                            {String.fromCharCode(65 + question.correct_answer)}.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* For paragraph questions, show student answer and feedback */}
+                    {questionType === "paragraph" && (
+                      <div className="mt-3">
+                        <div className="mb-3">
+                          <div className="font-medium mb-1">Your Answer:</div>
+                          <div className="p-3 bg-white border rounded">
+                            {studentAnswer || (
+                              <em className="text-gray-500">
+                                No answer provided
+                              </em>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
 
-                    {!isCorrect && (
-                      <div className="mt-2 text-sm text-red-600">
-                        You selected{" "}
-                        {selectedAnswer !== null
-                          ? String.fromCharCode(65 + selectedAnswer)
-                          : "no option"}
-                        , but the correct answer was{" "}
-                        {String.fromCharCode(65 + question.correct_answer)}.
+                        <div className="mb-3">
+                          <div className="font-medium mb-1">Score:</div>
+                          <div className="flex items-center">
+                            <div
+                              className={`text-lg font-bold ${
+                                questionScore >= 7
+                                  ? "text-green-600"
+                                  : questionScore >= 4
+                                  ? "text-amber-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {questionScore !== null
+                                ? questionScore.toFixed(1)
+                                : 0}{" "}
+                              / 10
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="font-medium mb-1">AI Feedback:</div>
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                            {feedback || "No feedback available"}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

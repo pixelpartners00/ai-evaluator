@@ -73,6 +73,14 @@ const TakeTest = ({ userId }) => {
     });
   };
 
+  const handleParagraphAnswerChange = (questionIndex, answerText) => {
+    setAnswers((prev) => {
+      const newAnswers = [...prev];
+      newAnswers[questionIndex] = answerText;
+      return newAnswers;
+    });
+  };
+
   const goToPreviousQuestion = () => {
     setCurrentQuestion((prev) => Math.max(0, prev - 1));
   };
@@ -176,28 +184,39 @@ const TakeTest = ({ userId }) => {
         </h2>
 
         <div className="space-y-3">
-          {currentQuestionData.options.map((option, index) => (
-            <label
-              key={index}
-              className={`block p-3 border rounded-lg cursor-pointer
-                ${
-                  answers[currentQuestion] === index
-                    ? "border-indigo-600 bg-indigo-50"
-                    : "hover:bg-gray-50"
-                }`}
-            >
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  className="mr-3"
-                  name={`question-${currentQuestion}`}
-                  checked={answers[currentQuestion] === index}
-                  onChange={() => handleAnswerChange(currentQuestion, index)}
-                />
-                <span>{option}</span>
-              </div>
-            </label>
-          ))}
+          {currentQuestionData.type === "paragraph" ? (
+            <textarea
+              className="w-full p-3 border rounded-lg"
+              rows="5"
+              value={answers[currentQuestion] || ""}
+              onChange={(e) =>
+                handleParagraphAnswerChange(currentQuestion, e.target.value)
+              }
+            />
+          ) : (
+            currentQuestionData.options.map((option, index) => (
+              <label
+                key={index}
+                className={`block p-3 border rounded-lg cursor-pointer
+                  ${
+                    answers[currentQuestion] === index
+                      ? "border-indigo-600 bg-indigo-50"
+                      : "hover:bg-gray-50"
+                  }`}
+              >
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    className="mr-3"
+                    name={`question-${currentQuestion}`}
+                    checked={answers[currentQuestion] === index}
+                    onChange={() => handleAnswerChange(currentQuestion, index)}
+                  />
+                  <span>{option}</span>
+                </div>
+              </label>
+            ))
+          )}
         </div>
       </div>
 

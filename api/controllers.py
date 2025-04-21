@@ -133,12 +133,19 @@ class TeacherController:
                 
             if 'text' not in question:
                 return jsonify({"error": f"Question at index {i} is missing 'text' field"}), 400
-                
-            if 'options' not in question or not isinstance(question['options'], list):
-                return jsonify({"error": f"Question at index {i} is missing 'options' field or it's not a list"}), 400
-                
-            if 'correct_answer' not in question:
-                return jsonify({"error": f"Question at index {i} is missing 'correct_answer' field"}), 400
+            
+            question_type = question.get('type', 'mcq')  # Default to mcq for backward compatibility
+            
+            if question_type == 'mcq':
+                if 'options' not in question or not isinstance(question['options'], list):
+                    return jsonify({"error": f"Question at index {i} is missing 'options' field or it's not a list"}), 400
+                    
+                if 'correct_answer' not in question:
+                    return jsonify({"error": f"Question at index {i} is missing 'correct_answer' field"}), 400
+            
+            elif question_type == 'paragraph':
+                if 'model_answer' not in question:
+                    return jsonify({"error": f"Paragraph question at index {i} is missing 'model_answer' field"}), 400
         
         # Create test
         test = Test.create(
@@ -153,6 +160,53 @@ class TeacherController:
             "message": "Test created successfully", 
             "test": test
         }), 201
+    
+    @staticmethod
+    def generate_ai_test():
+        """Generate a test using AI"""
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['title', 'created_by', 'num_questions', 'question_types']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"{field} is required"}), 400
+        
+        # Validate number of questions
+        try:
+            num_questions = int(data['num_questions'])
+            if num_questions <= 0 or num_questions > 50:
+                return jsonify({"error": "Number of questions must be between 1 and 50"}), 400
+        except ValueError:
+            return jsonify({"error": "num_questions must be a valid integer"}), 400
+        
+        # Validate question types
+        question_types = data['question_types']
+        if not isinstance(question_types, list) or not question_types:
+            return jsonify({"error": "question_types must be a non-empty list"}), 400
+            
+        if not all(qtype in ['mcq', 'paragraph'] for qtype in question_types):
+            return jsonify({"error": "question_types must contain only 'mcq' and/or 'paragraph'"}), 400
+        
+        try:
+            # Generate test with AI
+            test = Test.generate_ai_test(
+                title=data['title'],
+                description=data.get('description', ''),
+                num_questions=num_questions,
+                question_types=question_types,
+                subject_area=data.get('subject_area'),
+                created_by=data['created_by'],
+                time_limit=data.get('time_limit', 60)
+            )
+            
+            return jsonify({
+                "message": "AI test generated successfully", 
+                "test": test
+            }), 201
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     
     @staticmethod
     def get_tests(teacher_id):
@@ -254,35 +308,17 @@ class StudentController:
         if attempt['is_completed']:
             return jsonify({"error": "Test attempt already completed"}), 400
         
-        # Get test
-        test = Test.get_by_id(attempt['test_id'])
-        if not test:
-            return jsonify({"error": "Test not found"}), 404
-        
-        # Calculate score
-        correct_count = 0
-        questions = test['questions']
-        answers = data['answers']
-        
-        for i, answer in enumerate(answers):
-            if i < len(questions) and answer == questions[i]['correct_answer']:
-                correct_count += 1
-        
-        score = (correct_count / len(questions)) * 100 if len(questions) > 0 else 0
-        
-        # Update attempt
-        update_data = {
-            'answers': answers,
-            'score': score,
-            'is_completed': True
-        }
-        
-        updated_attempt = TestAttempt.update(attempt_id, update_data)
-        
-        return jsonify({
-            "message": "Test submitted successfully",
-            "attempt": updated_attempt
-        }), 200
+        try:
+            # Use the new submit_with_evaluation method for AI-powered grading
+            updated_attempt = TestAttempt.submit_with_evaluation(attempt_id, data['answers'])
+            
+            return jsonify({
+                "message": "Test submitted successfully",
+                "attempt": updated_attempt
+            }), 200
+            
+        except Exception as e:
+            return jsonify({"error": f"Error submitting test: {str(e)}"}), 500
     
     @staticmethod
     def get_attempts(student_id):
