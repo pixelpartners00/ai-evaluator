@@ -14,6 +14,7 @@ import AdminDashboard from "./components/admin/Dashboard";
 import TeacherDashboard from "./components/teacher/Dashboard";
 import StudentDashboard from "./components/student/Dashboard";
 import CreateTest from "./components/teacher/CreateTest";
+import EditTest from "./components/teacher/EditTest";
 import AITestGenerator from "./components/teacher/AITestGenerator";
 import TakeTest from "./components/student/TakeTest";
 import TestResults from "./components/student/TestResults";
@@ -130,6 +131,17 @@ function App() {
               element={
                 user && user.role === "teacher" && user.is_approved ? (
                   <CreateTest userId={user._id} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+
+            <Route
+              path="/teacher/edit-test/:testId"
+              element={
+                user && user.role === "teacher" && user.is_approved ? (
+                  <EditTest userId={user._id} />
                 ) : (
                   <Navigate to="/" replace />
                 )
