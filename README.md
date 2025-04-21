@@ -31,28 +31,35 @@ AI Evaluator is an advanced educational assessment platform that enables teacher
 ## Screenshots
 
 ### Teacher Dashboard
+
 <!-- Insert screenshot here -->
 
 ### Test Creation
+
 <!-- Insert screenshot here -->
 
 ### AI Test Generation
+
 <!-- Insert screenshot here -->
 
 ### Student Test Taking
+
 <!-- Insert screenshot here -->
 
 ### Test Results and Feedback
+
 <!-- Insert screenshot here -->
 
 ## Technology Stack
 
 ### Frontend
+
 - React.js with React Router for navigation
 - Tailwind CSS for styling
 - Axios for API communication
 
 ### Backend
+
 - Flask RESTful API
 - MongoDB database
 - Mistral LLM for AI capabilities
@@ -61,18 +68,22 @@ AI Evaluator is an advanced educational assessment platform that enables teacher
 ## Installation and Setup
 
 ### Prerequisites
+
 - Node.js (v14 or higher)
 - Python (v3.8 or higher)
 - MongoDB
 
 ### Frontend Setup
+
 1. Clone the repository:
+
    ```
    git clone https://github.com/yourusername/ai-evaluator.git
    cd ai-evaluator
    ```
 
 2. Install dependencies:
+
    ```
    npm install
    ```
@@ -83,23 +94,28 @@ AI Evaluator is an advanced educational assessment platform that enables teacher
    ```
 
 ### Backend Setup
+
 1. Navigate to the API directory:
+
    ```
    cd api
    ```
 
 2. Create and activate a virtual environment:
+
    ```
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. Install dependencies:
+
    ```
    pip install -r requirements.txt
    ```
 
 4. Create a `.env` file with the following variables:
+
    ```
    MISTRAL_API_URL=your_mistral_api_url
    MONGODB_URI=your_mongodb_connection_string
@@ -113,15 +129,18 @@ AI Evaluator is an advanced educational assessment platform that enables teacher
 ## Usage
 
 ### Default Admin Account
+
 - Username: admin
 - Password: admin
 
 ### User Roles
+
 - **Student**: Can take tests and view results
 - **Teacher**: Can create and manage tests (requires admin approval)
 - **Admin**: Can approve teacher accounts and manage the system
 
 ## Project Structure
+
 ```
 ai-evaluator/
 ├── api/                 # Backend Flask API
@@ -142,6 +161,7 @@ ai-evaluator/
 ## AI Integration
 
 The application integrates with the Mistral Large Language Model (LLM) for:
+
 1. Generating complete tests with questions and answers
 2. Evaluating student paragraph/essay responses
 3. Providing meaningful feedback on written answers
