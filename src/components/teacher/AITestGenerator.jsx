@@ -138,13 +138,36 @@ const AITestGenerator = ({ userId }) => {
               ></path>
             </svg>
           </div>
+
           <h2 className="text-xl font-semibold mb-2">
             Generating Test Questions
           </h2>
-          <p className="text-gray-600">
+
+          <p className="text-gray-600 mb-4">
             Our AI is creating your test based on the topic "{formData.title}".
-            This may take a minute...
+            {formData.question_types.includes("paragraph") ? (
+              <span className="block mt-2 text-orange-600">
+                Paragraph questions take longer to generate (up to 2-3 minutes)
+                due to the creation of detailed model answers.
+              </span>
+            ) : (
+              " This may take a minute..."
+            )}
           </p>
+
+          {/* Progress indicator */}
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+            <div
+              className="bg-indigo-600 h-2.5 rounded-full animate-pulse"
+              style={{ width: "100%" }}
+            ></div>
+          </div>
+
+          <div className="text-sm text-gray-500">
+            {formData.question_types.includes("paragraph")
+              ? "Please be patient. Complex questions with model answers take longer to generate."
+              : "Almost there..."}
+          </div>
         </div>
       ) : (
         <form
@@ -271,8 +294,18 @@ const AITestGenerator = ({ userId }) => {
               </label>
             </div>
             <p className="text-xs text-gray-600 mt-1">
-              {formData.question_types.includes("paragraph") &&
-                "Paragraph answers will be automatically graded by AI when students submit their work."}
+              {formData.question_types.includes("paragraph") && (
+                <>
+                  <span className="block mb-1">
+                    Paragraph answers will be automatically graded by AI when
+                    students submit their work.
+                  </span>
+                  <span className="block text-orange-600">
+                    Note: Generating paragraph questions takes 2-3 minutes due
+                    to creating detailed model answers.
+                  </span>
+                </>
+              )}
             </p>
           </div>
 

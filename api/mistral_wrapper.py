@@ -5,11 +5,12 @@ import urllib.parse
 import json
 
 class MistralAPI:
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, timeout=180):  # Increased default timeout to 180 seconds
         # Load environment variables
         load_dotenv()
         self.api_url = os.getenv("MISTRAL_API_URL")
         self.debug = debug
+        self.timeout = timeout  # Store timeout value
         
         if not self.api_url:
             raise ValueError("MISTRAL_API_URL is not set in the .env file")
@@ -44,8 +45,10 @@ class MistralAPI:
             
             if self.debug:
                 print(f"Sending request to: {endpoint_url}")
+                print(f"Using timeout: {self.timeout} seconds")
                 
-            response = requests.get(endpoint_url)
+            # Use the configured timeout (in seconds)
+            response = requests.get(endpoint_url, timeout=self.timeout)
             
             if self.debug:
                 print(f"Status code: {response.status_code}")

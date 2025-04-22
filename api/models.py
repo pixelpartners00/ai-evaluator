@@ -149,19 +149,65 @@ class Test:
             dict: Generated test object
         """
         from mistral_wrapper import MistralAPI
+        import json
+        import re
+        import time
         
-        mistral = MistralAPI()
+        # For paragraph questions, use a staged approach generating one question at a time
+        # instead of all questions at once (which causes timeouts)
+        if 'paragraph' in question_types and not 'mcq' in question_types:
+            print(f"Using staged approach for {num_questions} paragraph questions")
+            return Test._generate_paragraph_questions_staged(
+                title, description, num_questions, subject_area, created_by, time_limit
+            )
+            
+        # For MCQ questions or mixed types, use the standard approach
+        # Use a longer timeout for paragraph questions (they take longer to generate)
+        timeout = 300 if 'paragraph' in question_types else 180
+        mistral = MistralAPI(debug=True, timeout=timeout)
         
         # Construct prompt for test generation
         context = f"Subject: {subject_area}" if subject_area else ""
+        
+        # Calculate distribution of question types
+        has_mcq = 'mcq' in question_types
+        has_paragraph = 'paragraph' in question_types
+        
+        # Define explicit question type requirements
+        question_type_instruction = ""
+        if has_mcq and not has_paragraph:
+            question_type_instruction = f"Generate EXACTLY {num_questions} multiple choice questions. DO NOT include any paragraph or essay questions. You MUST create {num_questions} questions, not more or less."
+        elif has_paragraph and not has_mcq:
+            question_type_instruction = f"""
+            Generate EXACTLY {num_questions} paragraph/essay questions. DO NOT include any multiple choice questions. 
+            You MUST create EXACTLY {num_questions} questions, not more or less.
+            Each paragraph question MUST include:
+            1. A detailed question text that requires an essay response
+            2. A comprehensive model answer (3-4 paragraphs) for grading
+            3. A list of 5-8 important keywords/concepts that should be included in a good answer
+            """
+        else:
+            # If both types are requested, distribute them evenly
+            mcq_count = num_questions // 2
+            para_count = num_questions - mcq_count
+            question_type_instruction = f"""
+            Generate EXACTLY {num_questions} questions with this specific distribution: 
+            - {mcq_count} multiple choice questions 
+            - {para_count} paragraph/essay questions
+            You MUST create exactly this number of questions with this exact distribution.
+            
+            For each paragraph question, include:
+            1. A detailed question text that requires an essay response
+            2. A comprehensive model answer (3-4 paragraphs) for grading
+            3. A list of 5-8 important keywords/concepts that should be included in a good answer
+            """
+        
         prompt = f"""
         Create a test on the topic: {title}
         {context}
         Description: {description}
         
-        Generate {num_questions} questions with the following distribution:
-        - {'Multiple choice questions' if 'mcq' in question_types else ''}
-        - {'Paragraph/essay questions' if 'paragraph' in question_types else ''}
+        {question_type_instruction}
         
         For multiple choice questions, include:
         1. The question text
@@ -171,8 +217,10 @@ class Test:
         For paragraph questions, include:
         1. The question text
         2. A model answer that would receive full marks
+        3. A list of keywords/concepts that should be included in a good answer
         
-        Format your response as a valid JSON array of questions.
+        Format your response as a valid JSON array of questions with proper formatting.
+        Ensure all JSON is correctly formatted with no trailing commas or syntax errors.
         """
         
         # Set instructions for AI to generate structured test data
@@ -189,45 +237,168 @@ class Test:
            - 'keywords' (array of strings): Important concepts that should be included
            - 'max_score' (number): Maximum points for the question (default: 10)
         
-        Example:
-        [
-          {
-            "text": "What is the capital of France?",
-            "type": "mcq",
-            "options": ["Berlin", "London", "Paris", "Madrid"],
-            "correct_answer": 2
-          },
-          {
-            "text": "Explain the water cycle and its importance to ecosystems.",
-            "type": "paragraph",
-            "model_answer": "The water cycle is the continuous movement of water within Earth and its atmosphere...",
-            "keywords": ["evaporation", "condensation", "precipitation", "collection", "ecosystems"],
-            "max_score": 10
-          }
-        ]
+        IMPORTANT: Your response must be valid JSON with proper formatting. Double-check for syntax errors, especially:
+        - Make sure all strings are properly quoted with double quotes
+        - All properties and string values need to be enclosed in double quotes
+        - No trailing commas in arrays or objects
+        - Correct use of brackets and braces
         """
         
         try:
             # Get AI-generated questions
             response = mistral.get_response(prompt, instructions)
             
-            # Parse JSON response - handle potential formatting issues
-            import json
-            import re
+            print(f"Raw API response (first 1000 chars): {response[:1000]}...")
             
-            # Extract JSON array if embedded in text
-            json_match = re.search(r'\[\s*\{.*\}\s*\]', response, re.DOTALL)
-            if json_match:
-                response = json_match.group(0)
+            # Enhanced JSON parsing with more robust error handling
+            try:
+                # First, try to parse directly in case the response is already valid JSON
+                questions = json.loads(response)
+            except json.JSONDecodeError:
+                # If direct parsing fails, try extraction and fixing approaches
                 
-            questions = json.loads(response)
+                # Try to extract JSON array if embedded in text
+                json_match = re.search(r'\[\s*\{.*\}\s*\]', response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    
+                    # Try to fix common JSON issues
+                    # Fix trailing commas
+                    json_str = re.sub(r',\s*}', '}', json_str)
+                    json_str = re.sub(r',\s*\]', ']', json_str)
+                    
+                    # Ensure properties are correctly quoted
+                    json_str = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_str)
+                    
+                    try:
+                        questions = json.loads(json_str)
+                    except json.JSONDecodeError as e:
+                        print(f"JSON parse error: {str(e)}")
+                        print(f"Attempted to parse: {json_str[:500]}...")
+                        raise Exception(f"Failed to parse the generated questions: {str(e)}")
+                else:
+                    raise Exception("No valid JSON found in the response")
+            
+            # Safeguard: If the questions is not a list, wrap it
+            if not isinstance(questions, list):
+                if isinstance(questions, dict):
+                    questions = [questions]
+                else:
+                    raise Exception("Generated questions are not in the expected format")
+            
+            print(f"Successfully parsed {len(questions)} questions")
+                    
+            # Post-processing to ensure only requested question types are included
+            filtered_questions = []
+            for question in questions:
+                q_type = question.get('type', 'mcq')
+                if q_type in question_types:
+                    # Ensure paragraph questions have keywords
+                    if q_type == 'paragraph' and 'keywords' not in question:
+                        # Extract keywords from model answer if not provided
+                        model_answer = question.get('model_answer', '')
+                        # Simple keyword extraction - split by spaces and take unique words over 5 chars
+                        words = set([word.strip('.,;:()[]{}"\'"').lower() for word in model_answer.split() if len(word) > 5])
+                        question['keywords'] = list(words)[:8]  # Take up to 8 keywords
+                    
+                    # Ensure paragraph questions have a max_score
+                    if q_type == 'paragraph' and 'max_score' not in question:
+                        question['max_score'] = 10
+                        
+                    filtered_questions.append(question)
+            
+            # If we've had to filter out unwanted question types, make sure we still have some questions
+            if not filtered_questions and questions:
+                filtered_questions = questions
+            
+            # Check if we have enough questions
+            if len(filtered_questions) < num_questions:
+                print(f"Warning: Generated only {len(filtered_questions)} questions but {num_questions} were requested")
+                
+                # If we specifically requested paragraph questions but got fewer than needed,
+                # try to generate additional questions to make up the difference
+                if has_paragraph and not has_mcq and len(filtered_questions) < num_questions:
+                    remaining = num_questions - len(filtered_questions)
+                    print(f"Attempting to generate {remaining} additional paragraph questions...")
+                    
+                    # Create additional paragraph questions manually
+                    for i in range(remaining):
+                        # Create a more specific prompt for a single paragraph question
+                        additional_prompt = f"""
+                        Create a detailed paragraph/essay question on the topic: {title}
+                        {context}
+                        Description: {description}
+                        
+                        Generate ONE well-formed question suitable for an advanced student exam.
+                        Include a comprehensive model answer (3-4 paragraphs) and a list of 5-8 important keywords.
+                        
+                        Format your response as a valid JSON object with proper formatting.
+                        """
+                        
+                        additional_instructions = """
+                        Generate a single paragraph question in valid JSON format with:
+                        {
+                          "text": "The detailed question text",
+                          "type": "paragraph",
+                          "model_answer": "A comprehensive model answer (3-4 paragraphs)",
+                          "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+                          "max_score": 10
+                        }
+                        """
+                        
+                        try:
+                            additional_response = mistral.get_response(additional_prompt, additional_instructions)
+                            
+                            # Parse the additional question
+                            try:
+                                # Try direct parsing first
+                                additional_question = json.loads(additional_response)
+                                
+                                # If we got a list with one item, use that item
+                                if isinstance(additional_question, list) and len(additional_question) > 0:
+                                    additional_question = additional_question[0]
+                                
+                                # Set type to paragraph if not already set
+                                additional_question['type'] = 'paragraph'
+                                
+                                # Add max_score if missing
+                                if 'max_score' not in additional_question:
+                                    additional_question['max_score'] = 10
+                                
+                                # Add to our filtered questions
+                                filtered_questions.append(additional_question)
+                                print(f"Successfully added additional paragraph question {i+1}/{remaining}")
+                                
+                            except json.JSONDecodeError:
+                                # Try to extract JSON object if embedded in text
+                                json_match = re.search(r'\{.*\}', additional_response, re.DOTALL)
+                                if json_match:
+                                    json_str = json_match.group(0)
+                                    # Fix common JSON formatting issues
+                                    json_str = re.sub(r',\s*}', '}', json_str)
+                                    json_str = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_str)
+                                    
+                                    additional_question = json.loads(json_str)
+                                    additional_question['type'] = 'paragraph'
+                                    if 'max_score' not in additional_question:
+                                        additional_question['max_score'] = 10
+                                    
+                                    filtered_questions.append(additional_question)
+                                    print(f"Successfully added additional paragraph question {i+1}/{remaining}")
+                                else:
+                                    print(f"Failed to parse additional question {i+1}: No valid JSON found")
+                        except Exception as e:
+                            print(f"Error generating additional question {i+1}: {str(e)}")
+                        
+                        # Brief pause between requests to avoid rate limiting
+                        time.sleep(1)
             
             # Create test with generated questions
             test = Test.create(
                 title=title,
                 description=description,
                 created_by=created_by,
-                questions=questions,
+                questions=filtered_questions,
                 time_limit=time_limit
             )
             
@@ -236,6 +407,133 @@ class Test:
         except Exception as e:
             print(f"Error generating AI test: {str(e)}")
             raise Exception(f"Failed to generate AI test: {str(e)}")
+            
+    @staticmethod
+    def _generate_paragraph_questions_staged(title, description, num_questions, subject_area=None, created_by=None, time_limit=60):
+        """
+        Generate paragraph questions one by one to avoid timeouts
+        """
+        from mistral_wrapper import MistralAPI
+        import json
+        import re
+        import time
+        
+        print(f"Generating {num_questions} paragraph questions individually")
+        questions = []
+        mistral = MistralAPI(debug=True, timeout=120)  # Use a shorter timeout for individual questions
+        context = f"Subject: {subject_area}" if subject_area else ""
+        
+        for i in range(num_questions):
+            print(f"Generating paragraph question {i+1}/{num_questions}")
+            
+            # Generate a single paragraph question with a shorter, more focused prompt
+            prompt = f"""
+            Create ONE detailed paragraph/essay question about {title}.
+            {context}
+            Description: {description}
+            
+            Make this question #{i+1} in a series of {num_questions} questions on this topic.
+            
+            The question should:
+            1. Be well-formed and challenging
+            2. Require a well-structured essay response
+            3. Be suitable for an educational assessment
+            
+            Format as JSON with these fields:
+            - text: question text
+            - type: "paragraph" 
+            - model_answer: 3-4 paragraph comprehensive answer
+            - keywords: 5-8 key concepts
+            - max_score: 10
+            """
+            
+            instructions = """
+            You are creating ONE paragraph question in valid JSON format:
+            {
+              "text": "The detailed question text",
+              "type": "paragraph",
+              "model_answer": "A comprehensive model answer (3-4 paragraphs)",
+              "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+              "max_score": 10
+            }
+            
+            Ensure proper JSON formatting with double quotes, no trailing commas, and proper use of brackets.
+            """
+            
+            try:
+                response = mistral.get_response(prompt, instructions)
+                
+                try:
+                    # Try direct parsing first
+                    question = json.loads(response)
+                    
+                    # If we got a list with one item, use that item
+                    if isinstance(question, list) and len(question) > 0:
+                        question = question[0]
+                        
+                except json.JSONDecodeError:
+                    # Try to extract JSON object if embedded in text
+                    json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                    if not json_match:
+                        print(f"Failed to find JSON in response for question {i+1}")
+                        print(f"Response preview: {response[:200]}...")
+                        # Create a simple fallback question
+                        question = {
+                            "text": f"Question #{i+1} about {title}. Please explain the key concepts related to this topic.",
+                            "type": "paragraph",
+                            "model_answer": f"This is a model answer about {title} covering key concepts in the field.",
+                            "keywords": ["concept", "theory", "analysis", "critical thinking", "evaluation"],
+                            "max_score": 10
+                        }
+                    else:
+                        json_str = json_match.group(0)
+                        # Fix common JSON formatting issues
+                        json_str = re.sub(r',\s*}', '}', json_str)
+                        json_str = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_str)
+                        
+                        question = json.loads(json_str)
+                
+                # Ensure type is set correctly
+                question['type'] = 'paragraph'
+                
+                # Ensure max_score is present
+                if 'max_score' not in question:
+                    question['max_score'] = 10
+                    
+                # Ensure keywords are present
+                if 'keywords' not in question or not question['keywords']:
+                    model_answer = question.get('model_answer', '')
+                    # Simple keyword extraction
+                    words = set([word.strip('.,;:()[]{}"\'"').lower() for word in model_answer.split() if len(word) > 5])
+                    question['keywords'] = list(words)[:8]  # Take up to 8 keywords
+                
+                questions.append(question)
+                print(f"Successfully generated question {i+1}")
+                
+            except Exception as e:
+                print(f"Error generating question {i+1}: {str(e)}")
+                # Create a simple fallback question in case of error
+                questions.append({
+                    "text": f"Question #{i+1} about {title}. Please explain the key concepts related to this topic.",
+                    "type": "paragraph",
+                    "model_answer": f"This is a model answer about {title} covering key concepts in the field.",
+                    "keywords": ["concept", "theory", "analysis", "critical thinking", "evaluation"],
+                    "max_score": 10
+                })
+                
+            # Brief pause between questions
+            time.sleep(1)
+        
+        # Create test with the generated questions
+        test = Test.create(
+            title=title,
+            description=description,
+            created_by=created_by,
+            questions=questions,
+            time_limit=time_limit
+        )
+        
+        return test
     
     @staticmethod
     def get_by_id(test_id):

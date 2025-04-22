@@ -9,7 +9,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # Initialize Mistral API
-mistral_api = MistralAPI()
+mistral_api = MistralAPI(timeout=300)  # 5 minute timeout for API requests
 
 # Create admin user on startup
 def create_admin():
