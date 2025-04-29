@@ -1,6 +1,6 @@
 # AI Evaluator
 
-A modern educational testing platform with AI-powered test generation and automated essay grading.
+A modern educational testing platform with AI-powered test generation and automated essay grading
 
 ## Overview
 
