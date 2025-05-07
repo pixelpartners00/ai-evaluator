@@ -32,23 +32,26 @@ AI Evaluator is an advanced educational assessment platform that enables teacher
 
 ### Teacher Dashboard
 
-<!-- Insert screenshot here -->
+![image](https://github.com/user-attachments/assets/6f670184-72ff-412a-8eed-85e8af5f8e9e)
 
 ### Test Creation
 
-<!-- Insert screenshot here -->
+![image](https://github.com/user-attachments/assets/2bbeee92-b29b-4fd4-9e92-da82ac4937c3)
+
 
 ### AI Test Generation
 
-<!-- Insert screenshot here -->
+![image](https://github.com/user-attachments/assets/6de081fd-ac02-4167-b3c2-3b3852375e4c)
+![image](https://github.com/user-attachments/assets/669cfad4-b600-41b6-9e4d-1638bc7a989a)
 
 ### Student Test Taking
 
-<!-- Insert screenshot here -->
+![image](https://github.com/user-attachments/assets/b48844be-1f33-40ce-ac5f-bb678f929c09)
 
 ### Test Results and Feedback
 
-<!-- Insert screenshot here -->
+![image](https://github.com/user-attachments/assets/64115f4b-24c6-4465-8dad-cde02304c4d5)
+![image](https://github.com/user-attachments/assets/a68be666-f290-4b59-b5cf-508b74277b6f)
 
 ## Technology Stack
 
