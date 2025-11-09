@@ -2,6 +2,8 @@
 
 A modern educational testing platform with AI-powered test generation and automated essay grading
 
+📄 **Research Paper:** [AI Evaluator: An AI-Powered Educational Assessment Platform (STM Journals, 2024)](https://journals.stmjournals.com/toeoc/article=2024/view=176042/)
+
 ## Overview
 
 AI Evaluator is an advanced educational assessment platform that enables teachers to create, manage, and evaluate tests while providing students with a streamlined interface for taking tests and reviewing detailed feedback. The application leverages artificial intelligence to generate test content and evaluate free-response answers.
