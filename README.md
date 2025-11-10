@@ -183,10 +183,6 @@ The application integrates with the Mistral Large Language Model (LLM) for:
 
 [MIT License](LICENSE)
 
-## Contributors
-
-- Your Name - Initial work
-
 ## Acknowledgments
 
 - Mistral AI for providing the LLM API
